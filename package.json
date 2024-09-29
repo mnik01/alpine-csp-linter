@@ -3,29 +3,42 @@
   "displayName": "alpine-csp-linter",
   "description": "Will show error if your alpine code is not CSP friendly",
   "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mnik01/alpine-csp-linter.git"
+  },
   "engines": {
     "vscode": "^1.93.0"
   },
   "categories": [
+    "Linters",
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onLanguage:html"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "alpine-csp-linter.helloWorld",
         "title": "Hello World"
+      },
+      {
+        "command": "extension.lintAlpineCSP",
+        "title": "Lint Alpine.js CSP"
       }
     ]
   },
   "scripts": {
-    "vscode:prepublish": "pnpm run package",
+    "vscode:prepublish": "npm run esbuild-base -- --minify",
+    "package": "pnpm vsce package --no-dependencies",
+    "publish": "pnpm vsce publish --no-dependencies",
+    "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node",
     "compile": "pnpm run check-types && pnpm run lint && node esbuild.js",
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
-    "package": "pnpm run check-types && pnpm run lint && node esbuild.js --production",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "pnpm run compile-tests && pnpm run compile && pnpm run lint",
@@ -34,16 +47,22 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.93.0",
+    "@types/babel__traverse": "^7.20.6",
     "@types/mocha": "^10.0.7",
     "@types/node": "20.x",
+    "@types/vscode": "^1.93.0",
     "@typescript-eslint/eslint-plugin": "^8.3.0",
     "@typescript-eslint/parser": "^8.3.0",
-    "eslint": "^9.9.1",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1",
     "esbuild": "^0.23.1",
+    "eslint": "^9.9.1",
     "npm-run-all": "^4.1.5",
     "typescript": "^5.5.4",
-    "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.4.1"
+    "vsce": "^2.15.0"
+  },
+  "dependencies": {
+    "@babel/parser": "^7.25.6",
+    "@babel/traverse": "^7.25.6"
   }
 }
