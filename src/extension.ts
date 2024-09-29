@@ -65,10 +65,13 @@ function lintDocument(document: vscode.TextDocument): vscode.Diagnostic[] {
 	const text = document.getText();
 	const diagnostics: vscode.Diagnostic[] = [];
 
+	// Remove HTML comments
+	const textWithoutComments = text.replace(/<!--[\s\S]*?-->/g, '');
+
 	// Check for inline x-data
 	const inlineXDataRegex = /x-data="\s*{[^}]*}"/g;
 	let match;
-	while ((match = inlineXDataRegex.exec(text)) !== null) {
+	while ((match = inlineXDataRegex.exec(textWithoutComments)) !== null) {
 			const range = new vscode.Range(
 					document.positionAt(match.index),
 					document.positionAt(match.index + match[0].length)
@@ -80,13 +83,18 @@ function lintDocument(document: vscode.TextDocument): vscode.Diagnostic[] {
 			));
 	}
 
-	// Check other Alpine directives
-	const directiveRegex = /(?:x-[\w-]+|@[\w-]+)="([^"]*)"/g;
-	while ((match = directiveRegex.exec(text)) !== null) {
-			const value = match[1];
+	// Check other Alpine directives, excluding x-for
+	const directiveRegex = /(?:x-(?!for)[\w-]+|@[\w-]+)="([^"]*)"/g;
+	while ((match = directiveRegex.exec(textWithoutComments)) !== null) {
+			const value = match[1].trim();
 			const startPos = document.positionAt(match.index);
 			const endPos = document.positionAt(match.index + match[0].length);
 			const range = new vscode.Range(startPos, endPos);
+
+			// Skip empty strings
+			if (value === '') {
+					continue;
+			}
 
 			// Check if the value is a simple property access or method call
 			if (/^[\w.]+$/.test(value)) {
@@ -95,14 +103,19 @@ function lintDocument(document: vscode.TextDocument): vscode.Diagnostic[] {
 			}
 
 			try {
-					const ast = parser.parse(value, { sourceType: 'module' });
+					// Remove JS comments before parsing
+					const valueWithoutComments = value.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+					const ast = parser.parse(valueWithoutComments, { sourceType: 'module' });
+					let hasViolation = false;
+
 					traverse(ast, {
 							enter(path) {
 									if (
 											path.isMemberExpression() && !path.node.computed ||
 											path.isIdentifier() ||
 											path.isStringLiteral() ||
-											path.isNumericLiteral()
+											path.isNumericLiteral() ||
+											path.isTemplateLiteral() && path.node.expressions.length === 0
 									) {
 											// These are allowed
 									} else if (
@@ -112,17 +125,22 @@ function lintDocument(document: vscode.TextDocument): vscode.Diagnostic[] {
 									) {
 											// Allow method calls without arguments
 									} else {
-											const diagnostic = new vscode.Diagnostic(
-													range,
-`Potential CSP violation: Only dot notation, static access, and method calls without arguments are allowed.
-Read more: https://alpinejs.dev/advanced/csp`,
-													vscode.DiagnosticSeverity.Error
-											);
-											diagnostics.push(diagnostic);
+											hasViolation = true;
 											path.stop(); // Stop traversing this branch
 									}
 							}
 					});
+
+					if (hasViolation) {
+							const diagnostic = new vscode.Diagnostic(
+									range,
+`Potential CSP violation: Only dot notation, static access, and method calls without arguments are allowed.
+
+Read more: https://alpinejs.dev/advanced/csp`,
+									vscode.DiagnosticSeverity.Error
+							);
+							diagnostics.push(diagnostic);
+					}
 			} catch (error) {
 					// Parsing error, likely due to incomplete expression. Ignore.
 			}
@@ -130,6 +148,7 @@ Read more: https://alpinejs.dev/advanced/csp`,
 
 	return diagnostics;
 }
+
 
 export function deactivate() {
     if (diagnosticCollection) {
