@@ -4,7 +4,7 @@
   "license": "MIT",
   "publisher": "mnik01",
   "description": "Will show error if your alpine code is not CSP friendly",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "repository": {
     "type": "git",
     "url": "https://github.com/mnik01/alpine-csp-linter.git"
